@@ -122,7 +122,8 @@
     "@typescript-eslint/parser": "^8.4.0",
     "eslint": "^9.10.0",
     "typescript": "^5.5.4",
-    "vscode-test": "^1.6.1"
+    "vscode-test": "^1.6.1",
+    "vsce": "^2.15.0"
   },
   "dependencies": {
     "highlight.js": "^11.10.0",

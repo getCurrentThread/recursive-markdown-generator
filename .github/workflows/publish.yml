@@ -1,0 +1,80 @@
+name: CI/CD
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Use Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: "14"
+
+      - name: Get version from tag
+        id: get_version
+        run: echo ::set-output name=VERSION::${GITHUB_REF#refs/tags/v}
+
+      - name: Update version in package.json
+        run: |
+          VERSION=${{ steps.get_version.outputs.VERSION }}
+          sed -i 's/"version": ".*"/"version": "'$VERSION'"/' package.json
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Compile
+        run: npm run compile
+
+      - name: Package Extension
+        run: npx vsce package
+
+      - name: Publish to Visual Studio Marketplace
+        if: success()
+        run: npx vsce publish -p ${{ secrets.VSCE_PAT }}
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+
+      - name: Generate Release Notes
+        id: generate_release_notes
+        run: |
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -z "$PREVIOUS_TAG" ]; then
+            COMMITS=$(git log --pretty=format:"- %s" ${{ github.ref }})
+          else
+            COMMITS=$(git log --pretty=format:"- %s" $PREVIOUS_TAG..${{ github.ref }})
+          fi
+          echo "RELEASE_NOTES<<EOF" >> $GITHUB_OUTPUT
+          echo "Release of version ${{ steps.get_version.outputs.VERSION }}" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "Changes in this Release:" >> $GITHUB_OUTPUT
+          echo "$COMMITS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ steps.get_version.outputs.VERSION }}
+          body: ${{ steps.generate_release_notes.outputs.RELEASE_NOTES }}
+          draft: false
+          prerelease: false
+
+      - name: Upload VSIX to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./recursive-markdown-generator-${{ steps.get_version.outputs.VERSION }}.vsix
+          asset_name: recursive-markdown-generator-${{ steps.get_version.outputs.VERSION }}.vsix
+          asset_content_type: application/octet-stream
