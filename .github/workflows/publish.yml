@@ -5,6 +5,9 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -15,7 +18,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: "14"
+          node-version: "20"
 
       - name: Get version from tag
         id: get_version
@@ -32,12 +35,15 @@ jobs:
       - name: Compile
         run: npm run compile
 
+      - name: Install specific version of vsce
+        run: npm install -g @vscode/vsce@2.32.0
+
       - name: Package Extension
-        run: npx vsce package
+        run: vsce package
 
       - name: Publish to Visual Studio Marketplace
         if: success()
-        run: npx vsce publish -p ${{ secrets.VSCE_PAT }}
+        run: vsce publish -p ${{ secrets.VSCE_PAT }}
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
 

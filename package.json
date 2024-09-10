@@ -116,14 +116,14 @@
   },
   "devDependencies": {
     "@types/highlight.js": "^10.1.0",
-    "@types/node": "14.x",
+    "@types/node": "20.x",
     "@types/vscode": "^1.75.0",
     "@typescript-eslint/eslint-plugin": "^8.4.0",
     "@typescript-eslint/parser": "^8.4.0",
     "eslint": "^9.10.0",
     "typescript": "^5.5.4",
     "vscode-test": "^1.6.1",
-    "vsce": "^2.15.0"
+    "@vscode/vsce": "^2.32.0"
   },
   "dependencies": {
     "highlight.js": "^11.10.0",
