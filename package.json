@@ -1,0 +1,136 @@
+{
+  "name": "recursive-markdown-generator",
+  "displayName": "Recursive Markdown Generator",
+  "description": "Recursively generate markdown from files in the current directory",
+  "version": "1.0.0",
+  "publisher": "getCurrentThread",
+  "author": {
+    "name": "getCurrentThread"
+  },
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "markdown",
+    "generator",
+    "recursive",
+    "documentation"
+  ],
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#C80000",
+    "theme": "dark"
+  },
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "recursive-markdown-generator",
+          "title": "Recursive Markdown Generator",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "recursive-markdown-generator": [
+        {
+          "type": "webview",
+          "id": "recursiveMarkdownView",
+          "name": "Recursive Markdown"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "recursive-markdown-generator.generate",
+        "title": "Generate Recursive Markdown",
+        "icon": "$(file-code)"
+      },
+      {
+        "command": "recursive-markdown-generator.download",
+        "title": "Download Markdown",
+        "icon": "$(cloud-download)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "recursive-markdown-generator.generate",
+          "when": "view == recursiveMarkdownView",
+          "group": "navigation"
+        },
+        {
+          "command": "recursive-markdown-generator.download",
+          "when": "view == recursiveMarkdownView",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Recursive Markdown Generator",
+      "properties": {
+        "recursiveMarkdownGenerator.ignorePatterns": {
+          "type": "array",
+          "default": [
+            "generated_markdown.md",
+            ".gitignore",
+            "*.db",
+            "LICENSE",
+            "package-lock.json",
+            "*.js.map",
+            "*.min.js",
+            ".idea/",
+            ".git/",
+            "node_modules/",
+            ".gradle/",
+            ".vscode/",
+            ".vscodeignore"
+          ],
+          "description": "Patterns to ignore when generating markdown"
+        },
+        "recursiveMarkdownGenerator.ignoreFiles": {
+          "type": "array",
+          "default": [
+            ".gitignore",
+            ".npmignore",
+            ".ignore"
+          ],
+          "description": "Files containing ignore patterns (e.g., .gitignore)"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/highlight.js": "^10.1.0",
+    "@types/node": "14.x",
+    "@types/vscode": "^1.75.0",
+    "@typescript-eslint/eslint-plugin": "^8.4.0",
+    "@typescript-eslint/parser": "^8.4.0",
+    "eslint": "^9.10.0",
+    "typescript": "^5.5.4",
+    "vscode-test": "^1.6.1"
+  },
+  "dependencies": {
+    "highlight.js": "^11.10.0",
+    "ignore": "^5.3.2",
+    "isbinaryfile": "^5.0.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/getCurrentThread/recursive-markdown-generator.git"
+  }
+}
