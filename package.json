@@ -2,7 +2,7 @@
   "name": "recursive-markdown-generator",
   "displayName": "Recursive Markdown Generator",
   "description": "Recursively generate markdown from files in the current directory",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "publisher": "getCurrentThread",
   "author": {
     "name": "getCurrentThread"

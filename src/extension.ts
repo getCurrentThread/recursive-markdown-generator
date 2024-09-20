@@ -107,9 +107,10 @@ function generateMarkdownFromFileInfos(fileInfos: FileInfo[]): string {
     .map(({ relativePath, content }) => {
       const fence = createUniqueFence(content);
       const escapedContent = content; // escapeLatexDollars(content);
-      return `### ${relativePath}\n${fence}\n${escapedContent}${fence}\n\n`;
+      const fileExtension = path.extname(relativePath).slice(1); // Get the file extension without the dot
+      return `### ${relativePath}\n${fence}${fileExtension}\n${escapedContent}\n${fence}\n`;
     })
-    .join("");
+    .join("\n");
 }
 
 async function readFileContent(filePath: string): Promise<string> {
