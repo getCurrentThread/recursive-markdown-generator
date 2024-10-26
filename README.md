@@ -2,6 +2,8 @@
 
 Recursively generate markdown from files in the current directory.
 
+![sample image](sample.gif)
+
 ## Features
 
 - Generates a markdown file containing the content of all files in the current workspace
