@@ -2,7 +2,7 @@
   "name": "recursive-markdown-generator",
   "displayName": "Recursive Markdown Generator",
   "description": "Recursively generate markdown from files in the current directory",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "publisher": "getCurrentThread",
   "author": {
     "name": "getCurrentThread"
@@ -115,20 +115,21 @@
     "test": "node ./out/test/runTest.js"
   },
   "devDependencies": {
-    "@types/highlight.js": "^10.1.0",
-    "@types/node": "20.x",
+    "@types/node": "^20.11.0",
     "@types/vscode": "^1.75.0",
     "@typescript-eslint/eslint-plugin": "^8.4.0",
     "@typescript-eslint/parser": "^8.4.0",
-    "eslint": "^9.10.0",
-    "typescript": "^5.5.4",
-    "vscode-test": "^1.6.1",
-    "@vscode/vsce": "^2.32.0"
+    "@vscode/test-electron": "^2.3.8",
+    "eslint": "^9.22.0",
+    "typescript": "^5.8.2",
+    "@vscode/vsce": "^3.3.0"
   },
   "dependencies": {
     "highlight.js": "^11.10.0",
     "ignore": "^5.3.2",
-    "isbinaryfile": "^5.0.2"
+    "isbinaryfile": "^5.0.2",
+    "glob": "^10.3.10",
+    "mammoth": "^1.6.0"
   },
   "repository": {
     "type": "git",

@@ -4,6 +4,8 @@ import * as path from "path";
 import ignore from "ignore";
 import hljs from "highlight.js";
 import { isBinaryFileSync } from "isbinaryfile";
+import { glob } from "glob";
+import * as mammoth from "mammoth";
 
 let generatedMarkdown: string = "";
 
@@ -20,13 +22,6 @@ const createUniqueFence = (content: string): string => {
   const backtickGroups = content.match(/`+/g) || [];
   const maxBackticks = Math.max(...backtickGroups.map((group) => group.length), 2);
   return "`".repeat(maxBackticks + 1);
-};
-
-// Function to escape dollar signs in LaTeX-style math expressions
-const escapeLatexDollars = (content: string): string => {
-  return content.replace(/(\$\$[\s\S]*?\$\$|\$[^\$\n]+?\$)/g, (match) => {
-    return match.replace(/\$/g, "\\$");
-  });
 };
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
@@ -80,21 +75,50 @@ async function createIgnoreFilter(config: vscode.WorkspaceConfiguration, workspa
 }
 
 async function collectFileInfos(directory: string, ig: ReturnType<typeof ignore>): Promise<FileInfo[]> {
-  const files = await vscode.workspace.findFiles(new vscode.RelativePattern(directory, "**/*"));
+  // Use the new glob API
+  const files = await glob("**/*", {
+    cwd: directory,
+    dot: true,
+    nodir: true,
+    absolute: true,
+  });
+
   const fileInfos: FileInfo[] = [];
 
   await Promise.all(
-    files.map(async (file) => {
-      const relativePath = path.relative(directory, file.fsPath);
+    files.map(async (filePath) => {
+      const relativePath = path.relative(directory, filePath);
       const normalizedPath = normalizePath(relativePath);
 
-      if (!ig.ignores(normalizedPath) && !isBinaryFileSync(file.fsPath)) {
+      // Ignore filtered files
+      if (ig.ignores(normalizedPath)) {
+        return;
+      }
+
+      const fileExtension = path.extname(filePath).toLowerCase();
+
+      // Special handling for docx files
+      if (fileExtension === ".docx") {
         try {
-          const content = await readFileContent(file.fsPath);
-          fileInfos.push({ relativePath: normalizedPath, content: content });
+          const content = await extractDocxText(filePath);
+          fileInfos.push({ relativePath: normalizedPath, content });
         } catch (error) {
-          console.error(`Error reading file ${file.fsPath}:`, error);
+          console.error(`Error reading DOCX file ${filePath}:`, error);
         }
+        return;
+      }
+
+      // Skip other binary files
+      if (isBinaryFileSync(filePath)) {
+        return;
+      }
+
+      // Process normal text files
+      try {
+        const content = await readFileContent(filePath);
+        fileInfos.push({ relativePath: normalizedPath, content });
+      } catch (error) {
+        console.error(`Error reading file ${filePath}:`, error);
       }
     })
   );
@@ -102,21 +126,30 @@ async function collectFileInfos(directory: string, ig: ReturnType<typeof ignore>
   return fileInfos;
 }
 
+// Function to extract text from a DOCX file
+async function extractDocxText(filePath: string): Promise<string> {
+  try {
+    const buffer = await fs.readFile(filePath);
+    const result = await mammoth.extractRawText({ buffer });
+    return result.value || `[No text content found in ${path.basename(filePath)}]`;
+  } catch (error) {
+    throw new Error(`Unable to extract text from DOCX file: ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 function generateMarkdownFromFileInfos(fileInfos: FileInfo[]): string {
   return fileInfos
     .map(({ relativePath, content }) => {
       const fence = createUniqueFence(content);
-      const escapedContent = content; // escapeLatexDollars(content);
-      const fileExtension = path.extname(relativePath).slice(1); // Get the file extension without the dot
-      return `### ${relativePath}\n${fence}${fileExtension}\n${escapedContent}\n${fence}\n`;
+      const fileExtension = path.extname(relativePath).slice(1);
+      return `### ${relativePath}\n${fence}${fileExtension}\n${content}\n${fence}\n`;
     })
     .join("\n");
 }
 
 async function readFileContent(filePath: string): Promise<string> {
   try {
-    const buffer = await vscode.workspace.fs.readFile(vscode.Uri.file(filePath));
-    return buffer.toString();
+    return await fs.readFile(filePath, "utf-8");
   } catch (error) {
     throw new Error(`Unable to read file: ${filePath}`);
   }
@@ -125,7 +158,21 @@ async function readFileContent(filePath: string): Promise<string> {
 function convertFileInfosToHtml(fileInfos: FileInfo[]): string {
   return fileInfos
     .map(({ relativePath, content }) => {
-      const { language, value: highlightedCode } = hljs.highlightAuto(content);
+      const fileExtension = path.extname(relativePath).toLowerCase();
+      let highlightedCode: string;
+      let language: string;
+
+      // For DOCX files, don't apply syntax highlighting
+      if (fileExtension === ".docx") {
+        highlightedCode = content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        language = "plaintext";
+      } else {
+        // For other files, use syntax highlighting
+        const highlighted = hljs.highlightAuto(content);
+        highlightedCode = highlighted.value;
+        language = highlighted.language || "plaintext";
+      }
+
       return `
       <h3>${relativePath}</h3>
       <pre class="theme-atom-one-dark"><code class="hljs ${language}">${highlightedCode}</code></pre>
