@@ -3,11 +3,10 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import ignore from "ignore";
 import hljs from "highlight.js";
-import { isBinaryFileSync } from "isbinaryfile";
+import { isBinaryFile } from "isbinaryfile";
 import { glob } from "glob";
 import * as mammoth from "mammoth";
 
-let generatedMarkdown: string = "";
 
 interface FileInfo {
   relativePath: string;
@@ -16,6 +15,19 @@ interface FileInfo {
 
 // Path normalization function
 const normalizePath = (filePath: string): string => path.posix.normalize(filePath.split(path.sep).join(path.posix.sep));
+
+// HTML escape map for single-pass escaping
+const htmlEscapeMap: Record<string, string> = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#039;",
+};
+
+// Single-pass HTML escape function
+const escapeHtml = (text: string): string =>
+  text.replace(/[&<>"']/g, (char) => htmlEscapeMap[char]);
 
 // Function to create a unique code fence
 const createUniqueFence = (content: string): string => {
@@ -30,7 +42,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(MarkdownPreviewProvider.viewType, markdownPreviewProvider),
     vscode.commands.registerCommand("recursive-markdown-generator.generate", () => generateAndUpdateMarkdown(markdownPreviewProvider)),
-    vscode.commands.registerCommand("recursive-markdown-generator.download", () => downloadMarkdown())
+    vscode.commands.registerCommand("recursive-markdown-generator.download", () => downloadMarkdown(markdownPreviewProvider))
   );
 }
 
@@ -46,7 +58,7 @@ async function generateAndUpdateMarkdown(markdownPreviewProvider: MarkdownPrevie
     const config = vscode.workspace.getConfiguration("recursiveMarkdownGenerator");
     const ig = await createIgnoreFilter(config, workspaceFolder.uri.fsPath);
     const fileInfos = await collectFileInfos(workspaceFolder.uri.fsPath, ig);
-    generatedMarkdown = generateMarkdownFromFileInfos(fileInfos);
+    markdownPreviewProvider.generatedMarkdown = generateMarkdownFromFileInfos(fileInfos);
     const htmlContent = convertFileInfosToHtml(fileInfos);
     markdownPreviewProvider.updateContent(htmlContent);
     vscode.window.showInformationMessage("Markdown generated successfully");
@@ -83,16 +95,14 @@ async function collectFileInfos(directory: string, ig: ReturnType<typeof ignore>
     absolute: true,
   });
 
-  const fileInfos: FileInfo[] = [];
-
-  await Promise.all(
-    files.map(async (filePath) => {
+  const results = await Promise.all(
+    files.map(async (filePath): Promise<FileInfo | null> => {
       const relativePath = path.relative(directory, filePath);
       const normalizedPath = normalizePath(relativePath);
 
       // Ignore filtered files
       if (ig.ignores(normalizedPath)) {
-        return;
+        return null;
       }
 
       const fileExtension = path.extname(filePath).toLowerCase();
@@ -101,29 +111,30 @@ async function collectFileInfos(directory: string, ig: ReturnType<typeof ignore>
       if (fileExtension === ".docx") {
         try {
           const content = await extractDocxText(filePath);
-          fileInfos.push({ relativePath: normalizedPath, content });
+          return { relativePath: normalizedPath, content };
         } catch (error) {
           console.error(`Error reading DOCX file ${filePath}:`, error);
+          return null;
         }
-        return;
       }
 
       // Skip other binary files
-      if (isBinaryFileSync(filePath)) {
-        return;
+      if (await isBinaryFile(filePath)) {
+        return null;
       }
 
       // Process normal text files
       try {
         const content = await readFileContent(filePath);
-        fileInfos.push({ relativePath: normalizedPath, content });
+        return { relativePath: normalizedPath, content };
       } catch (error) {
         console.error(`Error reading file ${filePath}:`, error);
+        return null;
       }
     })
   );
 
-  return fileInfos;
+  return results.filter((info): info is FileInfo => info !== null);
 }
 
 // Function to extract text from a DOCX file
@@ -164,7 +175,7 @@ function convertFileInfosToHtml(fileInfos: FileInfo[]): string {
 
       // For DOCX files, don't apply syntax highlighting
       if (fileExtension === ".docx") {
-        highlightedCode = content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        highlightedCode = escapeHtml(content);
         language = "plaintext";
       } else {
         // For other files, use syntax highlighting
@@ -181,8 +192,8 @@ function convertFileInfosToHtml(fileInfos: FileInfo[]): string {
     .join("");
 }
 
-async function downloadMarkdown(): Promise<void> {
-  if (!generatedMarkdown) {
+async function downloadMarkdown(markdownPreviewProvider: MarkdownPreviewProvider): Promise<void> {
+  if (!markdownPreviewProvider.generatedMarkdown) {
     vscode.window.showErrorMessage("No markdown generated yet. Please generate markdown first.");
     return;
   }
@@ -200,7 +211,7 @@ async function downloadMarkdown(): Promise<void> {
   });
 
   if (uri) {
-    await fs.writeFile(uri.fsPath, generatedMarkdown);
+    await fs.writeFile(uri.fsPath, markdownPreviewProvider.generatedMarkdown);
     vscode.window.showInformationMessage(`Markdown saved to ${uri.fsPath}`);
   }
 }
@@ -208,8 +219,18 @@ async function downloadMarkdown(): Promise<void> {
 class MarkdownPreviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "recursiveMarkdownView";
   private _view?: vscode.WebviewView;
+  private _generatedMarkdown: string = "";
+  private _isInitialized: boolean = false;
 
   constructor(private readonly _extensionUri: vscode.Uri) {}
+
+  public get generatedMarkdown(): string {
+    return this._generatedMarkdown;
+  }
+
+  public set generatedMarkdown(value: string) {
+    this._generatedMarkdown = value;
+  }
 
   public resolveWebviewView(webviewView: vscode.WebviewView, _context: vscode.WebviewViewResolveContext, _token: vscode.CancellationToken): void {
     this._view = webviewView;
@@ -222,12 +243,16 @@ class MarkdownPreviewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
     webviewView.onDidChangeVisibility(async () => {
-      if (webviewView.visible) {
+      if (webviewView.visible && !this._isInitialized) {
+        this._isInitialized = true;
         await generateAndUpdateMarkdown(this);
       }
     });
 
-    generateAndUpdateMarkdown(this);
+    if (!this._isInitialized) {
+      this._isInitialized = true;
+      generateAndUpdateMarkdown(this);
+    }
   }
 
   public updateContent(content: string): void {
