@@ -37,6 +37,14 @@ Please report any issues on the GitHub repository.
 
 ## Release Notes
 
+### 1.2.0
+
+- Optimized file processing with async binary file detection
+- Improved HTML escaping performance with single-pass function
+- Better code encapsulation with class instance state management
+- Improved code block formatting with syntax highlighting support
+- Added file extension to code fences for proper syntax highlighting
+
 ### 1.1.0
 
 - Added support for extracting text content from Microsoft Word (.docx) files
