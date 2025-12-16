@@ -57,7 +57,7 @@ async function generateAndUpdateMarkdown(markdownPreviewProvider: MarkdownPrevie
     markdownPreviewProvider.updateContent("Generating markdown...");
     const config = vscode.workspace.getConfiguration("recursiveMarkdownGenerator");
     const ig = await createIgnoreFilter(config, workspaceFolder.uri.fsPath);
-    const maxFileSize = config.get("maxFileSize") || 512000; // 500KB in bytes
+    const maxFileSize :number = config.get("maxFileSize") || 512000; // 500KB in bytes
     const fileInfos = await collectFileInfos(workspaceFolder.uri.fsPath, ig, maxFileSize);
     markdownPreviewProvider.generatedMarkdown = generateMarkdownFromFileInfos(fileInfos);
     const htmlContent = convertFileInfosToHtml(fileInfos);
