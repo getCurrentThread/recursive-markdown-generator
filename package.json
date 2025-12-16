@@ -2,7 +2,7 @@
   "name": "recursive-markdown-generator",
   "displayName": "Recursive Markdown Generator",
   "description": "Recursively generate markdown from files in the current directory",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "publisher": "getCurrentThread",
   "author": {
     "name": "getCurrentThread"
@@ -102,6 +102,11 @@
             ".ignore"
           ],
           "description": "Files containing ignore patterns (e.g., .gitignore)"
+        },
+        "recursiveMarkdownGenerator.maxFileSize": {
+          "type": "number",
+          "default": 512000,
+          "description": "Maximum file size in bytes. Files larger than this will be skipped. (default: 512000 = 500KB)"
         }
       }
     }

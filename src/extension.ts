@@ -57,7 +57,8 @@ async function generateAndUpdateMarkdown(markdownPreviewProvider: MarkdownPrevie
     markdownPreviewProvider.updateContent("Generating markdown...");
     const config = vscode.workspace.getConfiguration("recursiveMarkdownGenerator");
     const ig = await createIgnoreFilter(config, workspaceFolder.uri.fsPath);
-    const fileInfos = await collectFileInfos(workspaceFolder.uri.fsPath, ig);
+    const maxFileSize = config.get("maxFileSize") || 512000; // 500KB in bytes
+    const fileInfos = await collectFileInfos(workspaceFolder.uri.fsPath, ig, maxFileSize);
     markdownPreviewProvider.generatedMarkdown = generateMarkdownFromFileInfos(fileInfos);
     const htmlContent = convertFileInfosToHtml(fileInfos);
     markdownPreviewProvider.updateContent(htmlContent);
@@ -86,7 +87,8 @@ async function createIgnoreFilter(config: vscode.WorkspaceConfiguration, workspa
   return ig;
 }
 
-async function collectFileInfos(directory: string, ig: ReturnType<typeof ignore>): Promise<FileInfo[]> {
+async function collectFileInfos(directory: string, ig: ReturnType<typeof ignore>, maxFileSize: number): Promise<FileInfo[]> {
+
   // Use the new glob API
   const files = await glob("**/*", {
     cwd: directory,
@@ -102,6 +104,18 @@ async function collectFileInfos(directory: string, ig: ReturnType<typeof ignore>
 
       // Ignore filtered files
       if (ig.ignores(normalizedPath)) {
+        return null;
+      }
+
+      // Check file size and skip if too large
+      try {
+        const stats = await fs.stat(filePath);
+        if (stats.size > maxFileSize) {
+          console.log(`Skipping large file (${stats.size} bytes > ${maxFileSize} bytes): ${normalizedPath}`);
+          return null;
+        }
+      } catch (error) {
+        console.error(`Error getting file stats ${filePath}:`, error);
         return null;
       }
 
